@@ -37,7 +37,7 @@ from oemof.tools import helpers
 from oemof.tools import economics
 
 import oemof.solph as solph
-from oemof.outputlib import processing, views
+from oemof.outputlib import processing, plot, views
 
 import logging
 import os
@@ -157,6 +157,28 @@ def optimise_storage_size(filename="storage_investment.csv", solver='cbc',
         custom_storage['sequences'].plot(kind='line', drawstyle='steps-post')
         plt.show()
         electricity_bus['sequences'].plot(kind='line', drawstyle='steps-post')
+        plt.show()
+
+    if plt is not None and not silent:
+        # I/O plot - Try smooth=True!
+        cdict = {
+            (('electricity', 'demand'), 'flow'): '#ce4aff',
+            (('electricity', 'excess_bel'), 'flow'): '#555555',
+            (('electricity', 'storage'), 'flow'): '#42c77a',
+            (('pp_gas', 'electricity'), 'flow'): '#636f6b',
+            (('pv', 'electricity'), 'flow'): '#ffde32',
+            (('storage', 'electricity'), 'flow'): '#42c77a',
+            (('wind', 'electricity'), 'flow'): '#5b5bae'}
+        fig = plt.figure(figsize=(10, 5))
+        myplot = plot.ViewPlot(results, 'electricity')
+        myplot.slice_results(date_from=pd.datetime(2012, 2, 15))
+        myplot.io_plot(cdict=cdict, ax=fig.add_subplot(1, 1, 1), smooth=False)
+        myplot.ax.set_ylabel('Power in MW')
+        myplot.ax.set_xlabel('Date')
+        myplot.ax.set_title("Electricity bus")
+        myplot.set_datetime_ticks(tick_distance=48, date_format='%d-%m-%Y')
+        myplot.outside_legend()
+        myplot.clear_legend_labels()
         plt.show()
 
     my_results = electricity_bus['sequences'].sum(axis=0).to_dict()

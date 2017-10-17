@@ -248,7 +248,8 @@ def run_example_checks():
 
     try:
         results = variable_chp.run_variable_chp_example(
-            192, solver=testdict[key]['solver'], tee_switch=False)
+            192, solver=testdict[key]['solver'], tee_switch=False, silent=True)
+
         testdict[key]['run'] = True
 
     except Exception as e:
