@@ -33,9 +33,9 @@ class EnergySystem(es.EnergySystem):
         # for now. See the TODO in :func:`constraint_grouping
         # <oemof.solph.groupings.constraint_grouping>` for more information.
         from . import GROUPINGS
-        from .custom import custom_grouping
+        from .components import component_grouping
         kwargs['groupings'] = (GROUPINGS +
-                               [custom_grouping] +
+                               [component_grouping] +
                                kwargs.get('groupings', []))
         super().__init__(**kwargs)
 
@@ -92,11 +92,11 @@ class Flow:
         the optimization problem. Note: This will refer all attributes to an
         investment variable instead of to the nominal_value. The nominal_value
         should not be set (or set to None) if an investment object is used.
-    binary :  :class:`oemof.solph.options.BinaryFlow` object
-        If an binary flow object is added here, the flow constraints will
+    nonconvex :  :class:`oemof.solph.options.NonConvex` object
+        If an nonconvex flow object is added here, the flow constraints will
         be altered significantly as the mathematical model for the flow
         will be different, i.e. constraint etc from
-        :class:`oemof.solph.blocks.BinaryFlow` will be used instead of
+        :class:`oemof.solph.blocks.NonConvexFlow` will be used instead of
         :class:`oemof.solph.blocks.Flow`. Note: this does not work in
         combination with the investment attribute set at the moment.
 
@@ -106,9 +106,9 @@ class Flow:
      * :py:class:`~oemof.solph.blocks.Flow`
      * :py:class:`~oemof.solph.blocks.InvestmentFlow` (additionally if
        Investment object is present)
-     * :py:class:`~oemof.solph.blocks.BinaryFlow` (If
-        binary  object is present, CAUTION: replaces
-        :py:class:`~oemof.solph.blocks.Flow` class)
+     * :py:class:`~oemof.solph.blocks.NonConvexFlow` (If
+        nonconvex  object is present, CAUTION: replaces
+        :py:class:`~oemof.solph.blocks.Flow` class and a MILP will be build)
 
     Examples
     --------
@@ -136,7 +136,7 @@ class Flow:
         # information afterwards when creating objects.
 
         scalars = ['nominal_value', 'fixed_costs', 'summed_max', 'summed_min',
-                   'investment', 'binary', 'discrete', 'fixed']
+                   'investment', 'nonconvex', 'integer', 'fixed']
         sequences = ['actual_value', 'positive_gradient', 'negative_gradient',
                      'variable_costs', 'min', 'max']
         defaults = {'fixed': False, 'min': 0, 'max': 1}
@@ -163,9 +163,9 @@ class Flow:
                 "Using the investment object the nominal_value" +
                 " is set to None.",
                 SyntaxWarning)
-        if self.investment and self.binary:
+        if self.investment and self.nonconvex:
             raise ValueError("Investment flows cannot be combined with " +
-                             "binary flows!")
+                             "nonconvex flows!")
 
 
 class Bus(on.Bus):
@@ -264,49 +264,3 @@ class LinearN1Transformer(on.Transformer):
         self.conversion_factors = {
             k: sequence(v)
             for k, v in kwargs.get('conversion_factors', {}).items()}
-
-
-class VariableFractionTransformer(LinearTransformer):
-    """A linear transformer with more than one output, where the fraction of
-    the output flows is variable. By now it is restricted to two output flows.
-
-    One main output flow has to be defined and is tapped by the remaining flow.
-    Thus, the main output will be reduced if the tapped output increases.
-    Therefore a loss index has to be defined. Furthermore a maximum efficiency
-    has to be specified if the whole flow is led to the main output
-    (tapped_output = 0). The state with the maximum tapped_output is described
-    through conversion factors equivalent to the LinearTransformer.
-
-    Parameters
-    ----------
-    conversion_factors : dict
-        Dictionary containing conversion factors for conversion of inflow
-        to specified outflow. Keys are output bus objects.
-        The dictionary values can either be a scalar or a sequence with length
-        of time horizon for simulation.
-    conversion_factor_single_flow : dict
-        The efficiency of the main flow if there is no tapped flow. Only one
-        key is allowed. Use one of the keys of the conversion factors. The key
-        indicates the main flow. The other output flow is the tapped flow.
-
-    Examples
-    --------
-    >>> bel = Bus(label='electricityBus')
-    >>> bth = Bus(label='heatBus')
-    >>> bgas = Bus(label='commodityBus')
-    >>> vft = VariableFractionTransformer(
-    ...    label='variable_chp_gas',
-    ...    inputs={bgas: Flow(nominal_value=10e10)},
-    ...    outputs={bel: Flow(), bth: Flow()},
-    ...    conversion_factors={bel: 0.3, bth: 0.5},
-    ...    conversion_factor_single_flow={bel: 0.5})
-
-    Notes
-    -----
-    The following sets, variables, constraints and objective parts are created
-     * :py:class:`~oemof.solph.blocks.VariableFractionTransformer`
-    """
-    def __init__(self, conversion_factor_single_flow, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.conversion_factor_single_flow = {
-            k: sequence(v) for k, v in conversion_factor_single_flow.items()}

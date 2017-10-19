@@ -9,8 +9,9 @@ from pyomo.core.base.block import SimpleBlock
 from pyomo.environ import (Binary, Set, NonNegativeReals, Var, Constraint,
                            Expression, BuildAction)
 import numpy as np
-import oemof.network as on
 import warnings
+from oemof.network import Bus, Transformer
+from oemof.solph import Flow, LinearTransformer
 from .options import Investment
 from .plumbing import sequence
 
@@ -18,8 +19,10 @@ from .plumbing import sequence
 # ------------------------------------------------------------------------------
 # Start of generic storage component
 # ------------------------------------------------------------------------------
-class GenericStorage(on.Transformer):
+
+class GenericStorage(Transformer):
     """
+    Component `GenericStorage` to model with basic characteristics of storages.
 
     Parameters
     ----------
@@ -65,6 +68,7 @@ class GenericStorage(on.Transformer):
      * :py:class:`~oemof.solph.blocks.InvestmentStorage` (if Investment object
        present)
     """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.nominal_capacity = kwargs.get('nominal_capacity')
@@ -122,6 +126,7 @@ def storage_nominal_value_warning(flow):
            "The value will be overwritten by the product of the " +
            "nominal_capacity and the nominal_{0}_capacity_ratio.")
     warnings.warn(msg.format(flow), SyntaxWarning)
+
 # ------------------------------------------------------------------------------
 # End of generic storage component
 # ------------------------------------------------------------------------------
@@ -130,8 +135,9 @@ def storage_nominal_value_warning(flow):
 # ------------------------------------------------------------------------------
 # Start of generic storage block
 # ------------------------------------------------------------------------------
+
 class GenericStorageBlock(SimpleBlock):
-    """ Storages (no investment)
+    r"""Storage without an :class:`.Investment` object.
 
     **The following sets are created:** (-> see basic sets at
     :class:`.OperationalModel` )
@@ -165,6 +171,7 @@ class GenericStorageBlock(SimpleBlock):
     The fixed costs expression can be accessed by `om.Storage.fixed_costs`
     and their value after optimization by: `om.Storage.fixed_costs()`.
     """
+
     CONSTRAINT_GROUP = True
 
     def __init__(self, *args, **kwargs):
@@ -249,8 +256,7 @@ class GenericStorageBlock(SimpleBlock):
 # Start of generic storage invest block
 # ------------------------------------------------------------------------------
 class GenericInvestmentStorageBlock(SimpleBlock):
-    """Storage with an :class:`.Investment` object.
-
+    r"""Storage with an :class:`.Investment` object.
 
     **The following sets are created:** (-> see basic sets at
     :class:`.OperationalModel` )
@@ -330,6 +336,7 @@ class GenericInvestmentStorageBlock(SimpleBlock):
     their value after optimization by :meth:`om.InvestStorages.fixed_costs()` .
     This works similar for investment costs with :attr:`*.investment_costs`.
     """
+
     CONSTRAINT_GROUP = True
 
     def __init__(self, *args, **kwargs):
@@ -468,13 +475,48 @@ class GenericInvestmentStorageBlock(SimpleBlock):
 # Start of generic CHP component
 # ------------------------------------------------------------------------------
 
-class GenericCHP(on.Transformer):
+class GenericCHP(Transformer):
     """
+    Component `GenericCHP` to model combined heat and power plants.
+
+    Can be used to model (combined cycle) extraction or back-pressure turbines
+    and used a mixed-integer linear formulation. Thus, it induces more
+    computational effort than the `VariableFractionTransformer` for the
+    benefit of higher accuracy.
+
+    The full set of equations is described in:
+    Mollenhauer, E., Christidis, A. & Tsatsaronis, G.
+    Evaluation of an energy- and exergy-based generic modeling
+    approach of combined heat and power plants
+    Int J Energy Environ Eng (2016) 7: 167.
+    https://doi.org/10.1007/s40095-016-0204-6
+
+    Only one adaption for the parameter `H_L_FG_share`has been made to
+    set the flue gas losses `H_L_FG` as share of the fuel flow `H_F`.
+
+    Also have a look at the examples on how to use it.
 
     Parameters
     ----------
-    Bla : numeric
-        Some description
+    fuel_input : dict
+        Dictionary with key-value-pair of `oemof.Bus` and `oemof.Flow` object
+        for the fuel input.
+    electrical_output : dict
+        Dictionary with key-value-pair of `oemof.Bus` and `oemof.Flow` object
+        for the electrical output. Related parameters like `P_max_woDH` are
+        passed as attributes of the `oemof.Flow` object.
+    heat_output : dict
+        Dictionary with key-value-pair of `oemof.Bus` and `oemof.Flow` object
+        for the heat output. Related parameters like `Q_CW_min` are passed as
+        attributes of the `oemof.Flow` object.
+    Beta : list of numerical values
+        Beta values in same dimension as all other parameters (length of
+        optimization period).
+    back_pressure : boolean
+        Flag to use back-pressure characteristics. Works of set to `True` and
+        `Q_CW_min` set to zero. See paper above for more information.
+    fixed_costs : numerical value
+        Fixed costs for length of optimization period.
 
     Notes
     -----
@@ -489,19 +531,16 @@ class GenericCHP(on.Transformer):
         self.electrical_output = kwargs.get('electrical_output')
         self.heat_output = kwargs.get('heat_output')
         self.Beta = sequence(kwargs.get('Beta'))
-        self.fixed_costs = sequence(kwargs.get('fixed_costs'))
+        self.back_pressure = kwargs.get('back_pressure')
+        self.fixed_costs = kwargs.get('fixed_costs')
         self._alphas = None
 
         # map specific flows to standard API
-        # (still hacky until @gnn fixes Node class)
         fuel_bus = list(self.fuel_input.keys())[0]
         fuel_flow = list(self.fuel_input.values())[0]
         fuel_bus.outputs.update({self: fuel_flow})
         self.outputs.update(kwargs.get('electrical_output'))
         self.outputs.update(kwargs.get('heat_output'))
-
-        # TODO: add property to convert attribute dimensions if scalars passed
-        # simple dict comprehension with max() would be sufficient
 
     def _calculate_alphas(self):
         """
@@ -550,14 +589,6 @@ class GenericCHP(on.Transformer):
 
         return self._alphas
 
-
-def storage_nominal_value_warning(flow):
-    msg = ("The nominal_value should not be set for {0} flows of storages." +
-           "The value will be overwritten by the product of the " +
-           "nominal_capacity and the nominal_{0}_capacity_ratio.")
-    warnings.warn(msg.format(flow), SyntaxWarning)
-
-
 # ------------------------------------------------------------------------------
 # End of generic CHP component
 # ------------------------------------------------------------------------------
@@ -567,11 +598,8 @@ def storage_nominal_value_warning(flow):
 # Start of generic CHP block
 # ------------------------------------------------------------------------------
 
-
 class GenericCHPBlock(SimpleBlock):
-    """
-    Block for the linear relation of nodes with type class:`.GenericCHP`.
-    """
+    """Block for the linear relation of nodes with type class:`.GenericCHP`."""
 
     CONSTRAINT_GROUP = True
 
@@ -585,8 +613,8 @@ class GenericCHPBlock(SimpleBlock):
         Parameters
         ----------
         group : list
-            List containing storage objects.
-            e.g. groups=[storage1, storage2,..]
+            List containing `GenericCHP` objects.
+            e.g. groups=[ghcp1, gchp2,..]
         """
         m = self.parent_block()
 
@@ -674,13 +702,26 @@ class GenericCHPBlock(SimpleBlock):
         self.H_F_4 = Constraint(self.GENERICCHPS, m.TIMESTEPS,
                                 rule=_H_F_4_rule)
 
+        def _H_L_FG_share_rule(block, n, t):
+            """Set flue gas losses as share of fuel flow (not in paper)."""
+            expr = 0
+            expr += - self.H_L_FG[n, t]
+            expr += self.H_F[n, t] * \
+                list(n.fuel_input.values())[0].H_L_FG_share[t]
+            return expr == 0
+        self.H_L_FG_share = Constraint(self.GENERICCHPS, m.TIMESTEPS,
+                                       rule=_H_L_FG_share_rule)
+
         def _P_restriction_rule(block, n, t):
             """Restrict P depending on fuel and heat flow."""
             expr = 0
             expr += self.P[n, t] + self.Q[n, t] + self.H_L_FG[n, t]
             expr += list(n.heat_output.values())[0].Q_CW_min[t] * self.Y[n, t]
             expr += - self.H_F[n, t]
-            return expr <= 0
+            if n.back_pressure is False:
+                return expr <= 0
+            else:
+                return expr == 0
         self.P_restriction = Constraint(self.GENERICCHPS, m.TIMESTEPS,
                                         rule=_P_restriction_rule)
 
@@ -695,20 +736,298 @@ class GenericCHPBlock(SimpleBlock):
 
         fixed_costs = 0
 
-        # m = self.parent_block()
-        #
-        # for n in self.GENERICCHPS:
-        #     if n.fixed_costs is not None:
-        #         P_max = max([n.P_max_woDH[t] for t in m.TIMESTEPS])
-        #         fixed_costs += P_max * n.fixed_costs
-        #         #fixed_costs += n.P_max_woDH * n.fixed_costs
-        #
-        # self.fixed_costs = Expression(expr=fixed_costs)
+        m = self.parent_block()
+
+        for n in self.GENERICCHPS:
+            if n.fixed_costs is not None:
+                P_max = [list(n.electrical_output.values())[0].P_max_woDH[t]
+                         for t in m.TIMESTEPS]
+                fixed_costs += max(P_max) * n.fixed_costs
+
+        self.fixed_costs = Expression(expr=fixed_costs)
 
         return fixed_costs
 
+# ------------------------------------------------------------------------------
+# End of generic CHP block
+# ------------------------------------------------------------------------------
 
-def custom_grouping(node):
+
+# ------------------------------------------------------------------------------
+# Start of VariableFractionTransformer component
+# ------------------------------------------------------------------------------
+
+class VariableFractionTransformer(LinearTransformer):
+    """
+    Component `GenericCHP` to model combined heat and power plants.
+
+    A linear transformer with more than one output, where the fraction of
+    the output flows is variable. By now it is restricted to two output flows.
+
+    One main output flow has to be defined and is tapped by the remaining flow.
+    Thus, the main output will be reduced if the tapped output increases.
+    Therefore a loss index has to be defined. Furthermore a maximum efficiency
+    has to be specified if the whole flow is led to the main output
+    (tapped_output = 0). The state with the maximum tapped_output is described
+    through conversion factors equivalent to the LinearTransformer.
+
+    Parameters
+    ----------
+    conversion_factors : dict
+        Dictionary containing conversion factors for conversion of inflow
+        to specified outflow. Keys are output bus objects.
+        The dictionary values can either be a scalar or a sequence with length
+        of time horizon for simulation.
+    conversion_factor_single_flow : dict
+        The efficiency of the main flow if there is no tapped flow. Only one
+        key is allowed. Use one of the keys of the conversion factors. The key
+        indicates the main flow. The other output flow is the tapped flow.
+
+    Examples
+    --------
+    >>> bel = Bus(label='electricityBus')
+    >>> bth = Bus(label='heatBus')
+    >>> bgas = Bus(label='commodityBus')
+    >>> vft = VariableFractionTransformer(
+    ...    label='variable_chp_gas',
+    ...    inputs={bgas: Flow(nominal_value=10e10)},
+    ...    outputs={bel: Flow(), bth: Flow()},
+    ...    conversion_factors={bel: 0.3, bth: 0.5},
+    ...    conversion_factor_single_flow={bel: 0.5})
+
+    Notes
+    -----
+    The following sets, variables, constraints and objective parts are created
+     * :py:class:`~oemof.solph.blocks.VariableFractionTransformer`
+    """
+
+    def __init__(self, conversion_factor_single_flow, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.conversion_factor_single_flow = {
+            k: sequence(v) for k, v in conversion_factor_single_flow.items()}
+
+
+# ------------------------------------------------------------------------------
+# End of VariableFractionTransformer component
+# ------------------------------------------------------------------------------
+
+
+# ------------------------------------------------------------------------------
+# Start of VariableFractionTransformer block
+# ------------------------------------------------------------------------------
+
+class VariableFractionTransformerBlock(SimpleBlock):
+    """Block for the linear relation of nodes with type
+    :class:`~oemof.solph.network.VariableFractionTransformer`
+
+    **The following sets are created:** (-> see basic sets at
+    :class:`.OperationalModel` )
+
+    VARIABLE_FRACTION_TRANSFORMERS
+        A set with all
+        :class:`~oemof.solph.network.VariableFractionTransformer` objects.
+
+    **The following constraints are created:**
+
+    Variable i/o relation :attr:`om.VariableFractionTransformer.relation[i,o,t]`
+        .. math::
+            flow(input, n, t) = \\\\
+            (flow(n, main\_output, t) + flow(n, tapped\_output, t) \\cdot \
+            main\_flow\_loss\_index(n, t)) /\\\\
+            efficiency\_condensing(n, t)\\\\
+            \\forall t \\in \\textrm{TIMESTEPS}, \\\\
+            \\forall n \\in \\textrm{VARIABLE\_FRACTION\_TRANSFORMERS}.
+
+    Out flow relation :attr:`om.VariableFractionTransformer.relation[i,o,t]`
+        .. math::
+            flow(n, main\_output, t) = flow(n, tapped\_output, t) \\cdot \\\\
+            conversion\_factor(n, main\_output, t) / \
+            conversion\_factor(n, tapped\_output, t\\\\
+            \\forall t \\in \\textrm{TIMESTEPS}, \\\\
+            \\forall n \\in \\textrm{VARIABLE\_FRACTION\_TRANSFORMERS}.
+    """
+
+    CONSTRAINT_GROUP = True
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def set_value(self, value):
+        pass
+
+    def clear(self):
+        pass
+
+    def _create(self, group=None):
+        """ Creates the linear constraint for the class:`LinearTransformer`
+        block.
+
+        Parameters
+        ----------
+        group : list
+            List of oemof.solph.LinearTransformers (trsf) objects for which
+            the linear relation of inputs and outputs is created
+            e.g. group = [trsf1, trsf2, trsf3, ...]. Note that the relation
+            is created for all existing relations of the inputs and all outputs
+            of the transformer. The components inside the list need to hold
+            a attribute `conversion_factors` of type dict containing the
+            conversion factors from inputs to outputs.
+        """
+        if group is None:
+            return None
+
+        m = self.parent_block()
+
+        for n in group:
+            n.inflow = list(n.inputs)[0]
+            n.label_main_flow = str(
+                [k for k, v in n.conversion_factor_single_flow.items()][0])
+            n.main_output = [o for o in n.outputs
+                             if n.label_main_flow == o.label][0]
+            n.tapped_output = [o for o in n.outputs
+                               if n.label_main_flow != o.label][0]
+            n.conversion_factor_single_flow_sq = (
+                n.conversion_factor_single_flow[
+                    m.es.groups[n.main_output.label]])
+            n.flow_relation_index = [
+                n.conversion_factors[m.es.groups[n.main_output.label]][t] /
+                n.conversion_factors[m.es.groups[n.tapped_output.label]][t]
+                for t in m.TIMESTEPS]
+            n.main_flow_loss_index = [
+                (n.conversion_factor_single_flow_sq[t] -
+                 n.conversion_factors[m.es.groups[n.main_output.label]][t]) /
+                n.conversion_factors[m.es.groups[n.tapped_output.label]][t]
+                for t in m.TIMESTEPS]
+
+        def _input_output_relation_rule(block):
+            """Connection between input, main output and tapped output.
+            """
+            for t in m.TIMESTEPS:
+                for g in group:
+                    lhs = m.flow[g.inflow, g, t]
+                    rhs = (
+                        (m.flow[g, g.main_output, t] +
+                         m.flow[g, g.tapped_output, t] *
+                         g.main_flow_loss_index[t]) /
+                        g.conversion_factor_single_flow_sq[t]
+                        )
+                    block.input_output_relation.add((n, t), (lhs == rhs))
+        self.input_output_relation = Constraint(group, noruleinit=True)
+        self.input_output_relation_build = BuildAction(
+            rule=_input_output_relation_rule)
+
+        def _out_flow_relation_rule(block):
+            """Relation between main and tapped output in full chp mode.
+            """
+            for t in m.TIMESTEPS:
+                for g in group:
+                    lhs = m.flow[g, g.main_output, t]
+                    rhs = (m.flow[g, g.tapped_output, t] *
+                           g.flow_relation_index[t])
+                    block.out_flow_relation.add((g, t), (lhs >= rhs))
+        self.out_flow_relation = Constraint(group, noruleinit=True)
+        self.out_flow_relation_build = BuildAction(
+                rule=_out_flow_relation_rule)
+
+# ------------------------------------------------------------------------------
+# End of VariableFractionTransformer block
+# ------------------------------------------------------------------------------
+
+
+# ------------------------------------------------------------------------------
+# Start of generic CAES component
+# ------------------------------------------------------------------------------
+
+class GenericCAES(Transformer):
+    """
+    Component `GenericCAES` to model arbitrary compressed air energy storages.
+
+    The full set of equations is described in:
+    Kaldemeyer, C.; Boysen, C.; Tuschy, I.
+    A Generic Formulation of Compressed Air Energy Storage as
+    Mixed Integer Linear Program – Unit Commitment of Specific
+    Technical Concepts in Arbitrary Market Environments
+    Materials Today: Proceedings 00 (2018) 0000–0000
+    [currently in review]
+
+    Parameters
+    ----------
+    fuel_input : dict
+        Dictionary with key-value-pair of `oemof.Bus` and `oemof.Flow` object
+        for the fuel input.
+    electrical_output : dict
+        Dictionary with key-value-pair of `oemof.Bus` and `oemof.Flow` object
+        for the electrical output.
+    heat_output : dict
+        Dictionary with key-value-pair of `oemof.Bus` and `oemof.Flow` object
+        for the electrical output.
+
+    Notes
+    -----
+    The following sets, variables, constraints and objective parts are created
+     * :py:class:`~oemof.solph.blocks.GenericCAES`
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.fuel_input = kwargs.get('fuel_input')
+        self.electrical_output = kwargs.get('electrical_output')
+        self.heat_output = kwargs.get('electrical_output')
+        self.params = kwargs.get('params')
+
+# ------------------------------------------------------------------------------
+# End of generic CAES component
+# ------------------------------------------------------------------------------
+
+
+# ------------------------------------------------------------------------------
+# Start of CAES block
+# ------------------------------------------------------------------------------
+
+class GenericCAESBlock(SimpleBlock):
+    """Block for nodes of class:`.GenericCAES`."""
+
+    CONSTRAINT_GROUP = True
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def _create(self, group=None):
+        """
+        Create constraints for GenericCAESBlock.
+
+        Parameters
+        ----------
+        group : list
+            List containing `.GenericCAES` objects.
+            e.g. groups=[gcaes1, gcaes2,..]
+        """
+        m = self.parent_block()
+
+        if group is None:
+            return None
+
+        self.GENERICCAES = Set(initialize=[n for n in group])
+
+        # variables
+        self.H_F = Var(self.GENERICCHPS, m.TIMESTEPS, within=NonNegativeReals)
+
+        def _h_flow_connection_rule(block, n, t):
+            """Link fuel consumption to component inflow."""
+            expr = 0
+            expr += self.H_F[n, t]
+            expr += - m.flow[list(n.fuel_input.keys())[0], n, t]
+            return expr == 0
+        self.h_flow_connection = Constraint(self.GENERICCHPS, m.TIMESTEPS,
+                                            rule=_h_flow_connection_rule)
+
+# ------------------------------------------------------------------------------
+# End of CAES block
+# ------------------------------------------------------------------------------
+
+
+def component_grouping(node):
     if isinstance(node, GenericStorage) and isinstance(node.investment,
                                                        Investment):
         return GenericInvestmentStorageBlock
@@ -717,3 +1036,5 @@ def custom_grouping(node):
         return GenericStorageBlock
     if isinstance(node, GenericCHP):
         return GenericCHPBlock
+    if isinstance(node, VariableFractionTransformer):
+        return VariableFractionTransformerBlock
