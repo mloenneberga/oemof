@@ -26,21 +26,22 @@ class ViewPlot:
 
     def __init__(self, results, node=None, **kwargs):
         self.results = results
-        if node is not None:
-            self.seq = views.node(results, node)['sequences']
-        else:
-            self.seq = pd.DataFrame()
-        self.in_cols = [c for c in self.seq.columns if c[0][1] == node]
-        self.out_cols = [c for c in self.seq.columns if c[0][0] == node]
-        self.node = node
-        self.subset = kwargs.get('subset', self.seq)
+        self.seq = pd.DataFrame()
+        self.subset = pd.DataFrame()
+        self.in_cols = None
+        self.out_cols = None
+        self.node = None
         self.ax = kwargs.get('ax')
         self.legend_kwargs = {}
+        if node is not None:
+            self.update_node(node)
 
     def update_node(self, node):
         self.seq = views.node(self.results, node)['sequences']
-        self.in_cols = [c for c in self.seq.columns if c[0][1] == node]
-        self.out_cols = [c for c in self.seq.columns if c[0][0] == node]
+        self.in_cols = [
+            c for c in self.seq.columns if (len(c[0]) > 1 and c[0][1] == node)]
+        self.out_cols = [
+            c for c in self.seq.columns if (len(c[0]) > 1 and c[0][0] == node)]
         self.node = node
         self.subset = self.seq
         self.legend_kwargs.pop('labels', None)
@@ -127,9 +128,13 @@ class ViewPlot:
             for more information.
         """
         dates = self.subset.index
+
+        xticks = [int(x) for x in self.ax.get_xticks()]
+
         if tick_distance is None:
             tick_distance = int(len(dates) / number_autoticks) - 1
-        self.ax.set_xticks(range(0, len(dates), tick_distance),
+
+        self.ax.set_xticks(range(xticks[0], xticks[-1], tick_distance),
                            minor=False)
         self.ax.set_xticklabels(
             [item.strftime(date_format)
@@ -221,7 +226,7 @@ class ViewPlot:
 
         self.subset = self.seq.loc[date_from:date_to]
 
-    def plot(self, **kwargs):
+    def plot(self, node=None, original_xticks=True, **kwargs):
         r""" Passing the subset attribute to the pandas plotting method. All
         parameters will be directly passed to pandas.DataFrame.plot(). See
         http://pandas.pydata.org/pandas-docs/stable/generated/pandas.DataFrame.plot.html
@@ -231,7 +236,12 @@ class ViewPlot:
         -------
         self
         """
-        self.ax = self.subset.plot(**kwargs)
+        if node is not None:
+            self.update_node(node)
+        if original_xticks:
+            self.ax = self.subset.plot(**kwargs)
+        else:
+            self.ax = self.subset.reset_index(drop=True).plot(**kwargs)
         self.legend_kwargs['handles'] = self.ax.get_legend_handles_labels()[0]
         self.legend_kwargs['labels'] = self.ax.get_legend_handles_labels()[1]
         return self
@@ -253,9 +263,9 @@ class ViewPlot:
             Keyword arguments to be passed to the pandas line plot.
         bar_kwa : dictionary
             Keyword arguments to be passed to the pandas bar plot.
-        lineorder : list
+        inorder : list
             Order of columns to plot the line plot
-        barorder : list
+        outorder : list
             Order of columns to plot the bar plot
 
         Note

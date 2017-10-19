@@ -150,13 +150,26 @@ def optimise_storage_size(filename="storage_investment.csv", solver='cbc',
     if not silent:
         print(results[(storage,)]['sequences'].head())
         print(results[(storage,)]['scalars'])
+
     custom_storage = views.node(results, 'storage')
     electricity_bus = views.node(results, 'electricity')
 
     if plt is not None and not silent:
-        custom_storage['sequences'].plot(kind='line', drawstyle='steps-post')
-        plt.show()
+        # Plot directly
+        ax = custom_storage['sequences'].plot(kind='line',
+                                              drawstyle='steps-post')
+        # ax.set_xlabel('Date')
+        # plt.show()
         electricity_bus['sequences'].plot(kind='line', drawstyle='steps-post')
+        plt.show()
+
+        # Plot using plot module
+        myplot = plot.ViewPlot(results)
+        myplot.plot('storage', kind='line', drawstyle='steps-post')
+        # myplot.ax.set_xlabel('Date')
+        # myplot.set_datetime_ticks(tick_distance=300, date_format='%d-%m-%Y')
+        # plt.show()
+        myplot.plot('electricity', kind='line', drawstyle='steps-post')
         plt.show()
 
     if plt is not None and not silent:
