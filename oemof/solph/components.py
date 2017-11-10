@@ -1038,3 +1038,92 @@ def component_grouping(node):
         return GenericCHPBlock
     if isinstance(node, VariableFractionTransformer):
         return VariableFractionTransformerBlock
+
+# ------------------------------------------------------------------------------
+# Start of Engine-Generator Component
+# ------------------------------------------------------------------------------
+class GenericEngineGenerator( Transformer ):
+    """
+    Component `GenericEngineGenerator` to model stationary engine-generators.
+
+    Parameters
+    ----------
+    fuel_curve : dict
+        Dictionary with key-value-pair of `oemof.Bus` and `oemof.Flow` object
+        for the fuel input.
+    electrical_output : dict
+        Dictionary with key-value-pair of `oemof.Bus` and `oemof.Flow` object
+        for the electrical output.
+
+    Notes
+    -----
+    The following sets, variables, constraints and objective parts are created
+     * :py:class:`~oemof.solph.blocks.GenericEngineGenerator`
+    """
+    #TODO add more information on the component
+
+    def __init__(self, *args, **kwargs):
+        super().__init__( *args, **kwargs )
+
+        self.fuel_input= kwargs.get( 'fuel_input' )
+        self.electrical_output = kwargs.get( 'electrical_output' )
+        self.fuel_curve = kwargs.get( 'fuel_curve' )
+
+# ------------------------------------------------------------------------------
+# End of Engine-Generator Component
+# ------------------------------------------------------------------------------
+
+# ------------------------------------------------------------------------------
+# Start of Engine-Generator Block
+# ------------------------------------------------------------------------------
+class GenericEngineGeneratorBlock( SimpleBlock ):
+    """Block for nodes of class:`.GenericEngineGenerator`."""
+
+    CONSTRAINT_GROUP = True
+
+    def __init__(self, *args, **kwargs):
+        super().__init__( *args, **kwargs )
+
+    def _create(self, group=None):
+        """
+        Create constraints for GenericEngineGeneratorBlock.
+
+        Parameters
+        ----------
+        group : list
+            List containing `.GenericEngineGenerators` objects.
+            e.g. groups=[genericeg1, genericeg2,..]
+        """
+        m = self.parent_block()
+
+        if group is None:
+            return None
+
+        self.GENERICEG = Set( initialize=[n for n in group] )
+
+        m = self.parent_block()
+
+        I = {n: [i for i in n.fuel_input][0] for n in group}
+        O = {n: [o for o in n.electrical_output.keys()] for n in group}
+
+        self.relation = Constraint(group, noruleinit=True)
+
+        def _input_output_relation(block,n,t):
+            for o in O[n]:
+                try:
+                    expr = 0
+                    expr += (m.flow[I[n], n, t] - 0.036 * m.flows[n, o].nominal_value * m.flows[n, o].max[t]) \
+                            / 0.284
+                    expr += - m.flow[n, o, t]
+                except:
+                    raise ValueError("Error in constraint creation",
+                                     "source: {0}, target: {1}".format(
+                                         n.label, o.label))
+                return expr ==0
+        self.fuel_curve_relation = Constraint(self.GENERICEG, m.TIMESTEPS,
+                                              rule=_input_output_relation)
+
+
+        # ------------------------------------------------------------------------------
+        # End of Engine-Generator Block
+        # ------------------------------------------------------------------------------
