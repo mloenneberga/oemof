@@ -1157,9 +1157,8 @@ class GenericEngineGeneratorBlock( SimpleBlock ):
                     for i in in_flows[n]:
                         for o in out_flows[n]:
                             try:
-                                lhs = (m.flow[i, n, t] - n.fuel_coeff_b *
-                                       m.flows[n, o].max[t] * m.NonConvexFlow.status[n,o,t])\
-                                      / n.fuel_coeff_a
+                                lhs = (m.flow[i, n, t] - n.fuel_coeff_b * m.NonConvexFlow.status[n, o, t])\
+                                      /n.fuel_coeff_a
                                 rhs = m.flow[n, o, t]
                             except:
                                 raise ValueError( "Error in constraint creation",
