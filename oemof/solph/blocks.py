@@ -12,7 +12,7 @@ from pyomo.core import (Var, Set, Constraint, BuildAction, Expression,
 from pyomo.core.base.block import SimpleBlock
 
 
-class Flow(SimpleBlock):
+class Flow( SimpleBlock ):
     r""" Flow block with definitions for standard flows.
 
     **The following variables are created**:
@@ -80,8 +80,9 @@ class Flow(SimpleBlock):
     their value after optimization by :meth:`om.Flow.fixed_costs()` .
     This works similar for variable costs with :attr:`*.variable_costs`.
     """
+
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__( *args, **kwargs )
 
     def _create(self, group=None):
         r""" Creates sets, variables and constraints for all standard flows.
@@ -100,45 +101,45 @@ class Flow(SimpleBlock):
 
         # ########################## SETS #################################
         # set for all flows with an global limit on the flow over time
-        self.SUMMED_MAX_FLOWS = Set(initialize=[
+        self.SUMMED_MAX_FLOWS = Set( initialize=[
             (g[0], g[1]) for g in group if g[2].summed_max is not None and
-            g[2].nominal_value is not None])
+                                           g[2].nominal_value is not None] )
 
-        self.SUMMED_MIN_FLOWS = Set(initialize=[
+        self.SUMMED_MIN_FLOWS = Set( initialize=[
             (g[0], g[1]) for g in group if g[2].summed_min is not None and
-            g[2].nominal_value is not None])
+                                           g[2].nominal_value is not None] )
 
         self.NEGATIVE_GRADIENT_FLOWS = Set(
             initialize=[(g[0], g[1]) for g in group
-                        if g[2].negative_gradient['ub'][0] is not None])
+                        if g[2].negative_gradient['ub'][0] is not None] )
 
         self.POSITIVE_GRADIENT_FLOWS = Set(
             initialize=[(g[0], g[1]) for g in group
-                        if g[2].positive_gradient['ub'][0] is not None])
+                        if g[2].positive_gradient['ub'][0] is not None] )
 
         self.INTEGER_FLOWS = Set(
             initialize=[(g[0], g[1]) for g in group
-                        if g[2].integer])
+                        if g[2].integer] )
         # ######################### Variables  ################################
 
-        self.positive_gradient = Var(self.POSITIVE_GRADIENT_FLOWS,
-                                     m.TIMESTEPS)
+        self.positive_gradient = Var( self.POSITIVE_GRADIENT_FLOWS,
+                                      m.TIMESTEPS )
 
-        self.negative_gradient = Var(self.NEGATIVE_GRADIENT_FLOWS,
-                                     m.TIMESTEPS)
+        self.negative_gradient = Var( self.NEGATIVE_GRADIENT_FLOWS,
+                                      m.TIMESTEPS )
 
-        self.integer_flow = Var(self.INTEGER_FLOWS,
-                                m.TIMESTEPS, within=NonNegativeIntegers)
+        self.integer_flow = Var( self.INTEGER_FLOWS,
+                                 m.TIMESTEPS, within=NonNegativeIntegers )
         # set upper bound of gradient variable
         for i, o, f in group:
             if m.flows[i, o].positive_gradient['ub'][0] is not None:
                 for t in m.TIMESTEPS:
                     self.positive_gradient[i, o, t].setub(
-                        f.positive_gradient['ub'][t] * f.nominal_value)
+                        f.positive_gradient['ub'][t] * f.nominal_value )
             if m.flows[i, o].negative_gradient['ub'][0] is not None:
                 for t in m.TIMESTEPS:
                     self.negative_gradient[i, o, t].setub(
-                        f.negative_gradient['ub'][t] * f.nominal_value)
+                        f.negative_gradient['ub'][t] * f.nominal_value )
 
         # ######################### CONSTRAINTS ###############################
 
@@ -146,25 +147,27 @@ class Flow(SimpleBlock):
             """Rule definition for build action of max. sum flow constraint.
             """
             for inp, out in self.SUMMED_MAX_FLOWS:
-                lhs = sum(m.flow[inp, out, ts] * m.timeincrement[ts]
-                          for ts in m.TIMESTEPS)
+                lhs = sum( m.flow[inp, out, ts] * m.timeincrement[ts]
+                           for ts in m.TIMESTEPS )
                 rhs = (m.flows[inp, out].summed_max *
                        m.flows[inp, out].nominal_value)
-                self.summed_max.add((inp, out), lhs <= rhs)
-        self.summed_max = Constraint(self.SUMMED_MAX_FLOWS, noruleinit=True)
-        self.summed_max_build = BuildAction(rule=_flow_summed_max_rule)
+                self.summed_max.add( (inp, out), lhs <= rhs )
+
+        self.summed_max = Constraint( self.SUMMED_MAX_FLOWS, noruleinit=True )
+        self.summed_max_build = BuildAction( rule=_flow_summed_max_rule )
 
         def _flow_summed_min_rule(model):
             """Rule definition for build action of min. sum flow constraint.
             """
             for inp, out in self.SUMMED_MIN_FLOWS:
-                lhs = sum(m.flow[inp, out, ts] * m.timeincrement[ts]
-                          for ts in m.TIMESTEPS)
+                lhs = sum( m.flow[inp, out, ts] * m.timeincrement[ts]
+                           for ts in m.TIMESTEPS )
                 rhs = (m.flows[inp, out].summed_min *
                        m.flows[inp, out].nominal_value)
-                self.summed_min.add((inp, out), lhs >= rhs)
-        self.summed_min = Constraint(self.SUMMED_MIN_FLOWS, noruleinit=True)
-        self.summed_min_build = BuildAction(rule=_flow_summed_min_rule)
+                self.summed_min.add( (inp, out), lhs >= rhs )
+
+        self.summed_min = Constraint( self.SUMMED_MIN_FLOWS, noruleinit=True )
+        self.summed_min_build = BuildAction( rule=_flow_summed_min_rule )
 
         def _positive_gradient_flow_rule(model):
             """Rule definition for positive gradient constraint.
@@ -172,16 +175,17 @@ class Flow(SimpleBlock):
             for inp, out in self.POSITIVE_GRADIENT_FLOWS:
                 for ts in m.TIMESTEPS:
                     if ts > 0:
-                        lhs = m.flow[inp, out, ts] - m.flow[inp, out, ts-1]
+                        lhs = m.flow[inp, out, ts] - m.flow[inp, out, ts - 1]
                         rhs = self.positive_gradient[inp, out, ts]
-                        self.positive_gradient_constr.add((inp, out, ts),
-                                                          lhs <= rhs)
+                        self.positive_gradient_constr.add( (inp, out, ts),
+                                                           lhs <= rhs )
                     else:
                         pass  # return(Constraint.Skip)
+
         self.positive_gradient_constr = Constraint(
-            self.POSITIVE_GRADIENT_FLOWS, noruleinit=True)
+            self.POSITIVE_GRADIENT_FLOWS, noruleinit=True )
         self.positive_gradient_build = BuildAction(
-            rule=_positive_gradient_flow_rule)
+            rule=_positive_gradient_flow_rule )
 
         def _negative_gradient_flow_rule(model):
             """Rule definition for negative gradient constraint.
@@ -189,24 +193,25 @@ class Flow(SimpleBlock):
             for inp, out in self.NEGATIVE_GRADIENT_FLOWS:
                 for ts in m.TIMESTEPS:
                     if ts > 0:
-                        lhs = m.flow[inp, out, ts-1] - m.flow[inp, out, ts]
+                        lhs = m.flow[inp, out, ts - 1] - m.flow[inp, out, ts]
                         rhs = self.negative_gradient[inp, out, ts]
-                        self.negative_gradient_constr.add((inp, out, ts),
-                                                          lhs <= rhs)
+                        self.negative_gradient_constr.add( (inp, out, ts),
+                                                           lhs <= rhs )
                     else:
                         pass  # return(Constraint.Skip)
+
         self.negative_gradient_constr = Constraint(
-            self.NEGATIVE_GRADIENT_FLOWS, noruleinit=True)
+            self.NEGATIVE_GRADIENT_FLOWS, noruleinit=True )
         self.negative_gradient_build = BuildAction(
-            rule=_negative_gradient_flow_rule)
+            rule=_negative_gradient_flow_rule )
 
         def _integer_flow_rule(block, i, o, t):
             """Force flow variable to NonNegativeInteger values.
             """
             return self.integer_flow[i, o, t] == m.flow[i, o, t]
 
-        self.integer_flow_constr = Constraint(self.INTEGER_FLOWS, m.TIMESTEPS,
-                                              rule=_integer_flow_rule)
+        self.integer_flow_constr = Constraint( self.INTEGER_FLOWS, m.TIMESTEPS,
+                                               rule=_integer_flow_rule )
 
     def _objective_expression(self):
         r""" Objective expression for all standard flows with fixed costs
@@ -238,14 +243,14 @@ class Flow(SimpleBlock):
 
             # add fixed costs if nominal_value is not None
             if (m.flows[i, o].fixed_costs and
-                    m.flows[i, o].nominal_value is not None):
+                        m.flows[i, o].nominal_value is not None):
                 fixed_costs += (m.flows[i, o].nominal_value *
                                 m.flows[i, o].fixed_costs)
 
         return fixed_costs + variable_costs + gradient_costs
 
 
-class InvestmentFlow(SimpleBlock):
+class InvestmentFlow( SimpleBlock ):
     r"""Block for all flows with :attr:`investment` being not None.
 
     **The following sets are created:** (-> see basic sets at
@@ -326,7 +331,7 @@ class InvestmentFlow(SimpleBlock):
     """
 
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__( *args, **kwargs )
 
     def _create(self, group=None):
         r"""Creates sets, variables and constraints for Flow with investment
@@ -345,20 +350,20 @@ class InvestmentFlow(SimpleBlock):
         m = self.parent_block()
 
         # ######################### SETS #####################################
-        self.FLOWS = Set(initialize=[(g[0], g[1]) for g in group])
+        self.FLOWS = Set( initialize=[(g[0], g[1]) for g in group] )
 
         self.FIXED_FLOWS = Set(
-            initialize=[(g[0], g[1]) for g in group if g[2].fixed])
+            initialize=[(g[0], g[1]) for g in group if g[2].fixed] )
 
-        self.SUMMED_MAX_FLOWS = Set(initialize=[
-            (g[0], g[1]) for g in group if g[2].summed_max is not None])
+        self.SUMMED_MAX_FLOWS = Set( initialize=[
+            (g[0], g[1]) for g in group if g[2].summed_max is not None] )
 
-        self.SUMMED_MIN_FLOWS = Set(initialize=[
-            (g[0], g[1]) for g in group if g[2].summed_min is not None])
+        self.SUMMED_MIN_FLOWS = Set( initialize=[
+            (g[0], g[1]) for g in group if g[2].summed_min is not None] )
 
-        self.MIN_FLOWS = Set(initialize=[
+        self.MIN_FLOWS = Set( initialize=[
             (g[0], g[1]) for g in group if sum(
-                [g[2].min[t] for t in m.TIMESTEPS]) > 0])
+                [g[2].min[t] for t in m.TIMESTEPS] ) > 0] )
 
         # ######################### VARIABLES #################################
         def _investvar_bound_rule(block, i, o):
@@ -366,9 +371,10 @@ class InvestmentFlow(SimpleBlock):
             """
             return (m.flows[i, o].investment.minimum,
                     m.flows[i, o].investment.maximum)
+
         # create variable bounded for flows with investement attribute
-        self.invest = Var(self.FLOWS, within=NonNegativeReals,
-                          bounds=_investvar_bound_rule)
+        self.invest = Var( self.FLOWS, within=NonNegativeReals,
+                           bounds=_investvar_bound_rule )
 
         # ######################### CONSTRAINTS ###############################
 
@@ -380,8 +386,9 @@ class InvestmentFlow(SimpleBlock):
             """
             return (m.flow[i, o, t] == (self.invest[i, o] *
                                         m.flows[i, o].actual_value[t]))
-        self.fixed = Constraint(self.FIXED_FLOWS, m.TIMESTEPS,
-                                rule=_investflow_fixed_rule)
+
+        self.fixed = Constraint( self.FIXED_FLOWS, m.TIMESTEPS,
+                                 rule=_investflow_fixed_rule )
 
         def _max_investflow_rule(block, i, o, t):
             """Rule definition of constraint setting an upper bound of flow
@@ -390,8 +397,9 @@ class InvestmentFlow(SimpleBlock):
             expr = (m.flow[i, o, t] <= (m.flows[i, o].max[t] *
                                         self.invest[i, o]))
             return expr
-        self.max = Constraint(self.FLOWS, m.TIMESTEPS,
-                              rule=_max_investflow_rule)
+
+        self.max = Constraint( self.FLOWS, m.TIMESTEPS,
+                               rule=_max_investflow_rule )
 
         def _min_investflow_rule(block, i, o, t):
             """Rule definition of constraint setting a lower bound on flow
@@ -400,37 +408,40 @@ class InvestmentFlow(SimpleBlock):
             expr = (m.flow[i, o, t] >= (m.flows[i, o].min[t] *
                                         self.invest[i, o]))
             return expr
-        self.min = Constraint(self.MIN_FLOWS, m.TIMESTEPS,
-                              rule=_min_investflow_rule)
+
+        self.min = Constraint( self.MIN_FLOWS, m.TIMESTEPS,
+                               rule=_min_investflow_rule )
 
         def _summed_max_investflow_rule(block, i, o):
             """Rule definition for build action of max. sum flow constraint
             in investment case.
             """
-            expr = (sum(m.flow[i, o, t] * m.timeincrement[t]
-                        for t in m.TIMESTEPS) <=
+            expr = (sum( m.flow[i, o, t] * m.timeincrement[t]
+                         for t in m.TIMESTEPS ) <=
                     m.flows[i, o].summed_max * self.invest[i, o])
             return expr
-        self.summed_max = Constraint(self.SUMMED_MAX_FLOWS,
-                                     rule=_summed_max_investflow_rule)
+
+        self.summed_max = Constraint( self.SUMMED_MAX_FLOWS,
+                                      rule=_summed_max_investflow_rule )
 
         def _summed_min_investflow_rule(block, i, o):
             """Rule definition for build action of min. sum flow constraint
             in investment case.
             """
-            expr = (sum(m.flow[i, o, t] * m.timeincrement[t]
-                        for t in m.TIMESTEPS) >=
+            expr = (sum( m.flow[i, o, t] * m.timeincrement[t]
+                         for t in m.TIMESTEPS ) >=
                     m.flows[i, o].summed_min * self.invest[i, o])
             return expr
-        self.summed_min = Constraint(self.SUMMED_MIN_FLOWS,
-                                     rule=_summed_min_investflow_rule)
+
+        self.summed_min = Constraint( self.SUMMED_MIN_FLOWS,
+                                      rule=_summed_min_investflow_rule )
 
     def _objective_expression(self):
         r""" Objective expression for flows with investment attribute of type
         class:`.Investment`. The returned costs are fixed, variable and
         investment costs.
         """
-        if not hasattr(self, 'FLOWS'):
+        if not hasattr( self, 'FLOWS' ):
             return 0
 
         m = self.parent_block()
@@ -448,16 +459,16 @@ class InvestmentFlow(SimpleBlock):
                 investment_costs += (self.invest[i, o] *
                                      m.flows[i, o].investment.ep_costs)
             else:
-                raise ValueError("Missing value for investment costs!")
+                raise ValueError( "Missing value for investment costs!" )
 
-        self.investment_costs = Expression(expr=investment_costs)
-        self.fixed_costs = Expression(expr=fixed_costs)
-        self.variable_costs = Expression(expr=variable_costs)
+        self.investment_costs = Expression( expr=investment_costs )
+        self.fixed_costs = Expression( expr=fixed_costs )
+        self.variable_costs = Expression( expr=variable_costs )
 
         return fixed_costs + variable_costs + investment_costs
 
 
-class Bus(SimpleBlock):
+class Bus( SimpleBlock ):
     r"""Block for all balanced buses.
 
     **The following constraints are build:**
@@ -471,8 +482,9 @@ class Bus(SimpleBlock):
 
     Hallo
     """
+
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__( *args, **kwargs )
 
     def _create(self, group=None):
         """Creates the balance constraints for the class:`Bus` block.
@@ -497,19 +509,20 @@ class Bus(SimpleBlock):
         def _busbalance_rule(block):
             for t in m.TIMESTEPS:
                 for n in group:
-                    lhs = sum(m.flow[i, n, t] * m.timeincrement[t]
-                              for i in I[n])
-                    rhs = sum(m.flow[n, o, t] * m.timeincrement[t]
-                              for o in O[n])
+                    lhs = sum( m.flow[i, n, t] * m.timeincrement[t]
+                               for i in I[n] )
+                    rhs = sum( m.flow[n, o, t] * m.timeincrement[t]
+                               for o in O[n] )
                     expr = (lhs == rhs)
                     # no inflows no outflows yield: 0 == 0 which is True
                     if expr is not True:
-                        block.balance.add((n, t), expr)
-        self.balance = Constraint(group, noruleinit=True)
-        self.balance_build = BuildAction(rule=_busbalance_rule)
+                        block.balance.add( (n, t), expr )
+
+        self.balance = Constraint( group, noruleinit=True )
+        self.balance_build = BuildAction( rule=_busbalance_rule )
 
 
-class Transformer(SimpleBlock):
+class Transformer( SimpleBlock ):
     r"""Block for the linear relation of nodes with type
     :class:`~oemof.solph.network.Transformer`
 
@@ -530,8 +543,9 @@ class Transformer(SimpleBlock):
             \forall i \in \textrm{INPUTS(n)}, \\
             \forall o \in \textrm{OUTPUTS(n)}.
     """
+
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__( *args, **kwargs )
 
     def _create(self, group=None):
         """ Creates the linear constraint for the class:`Transformer`
@@ -555,7 +569,7 @@ class Transformer(SimpleBlock):
         in_flows = {n: [i for i in n.inputs.keys()] for n in group}
         out_flows = {n: [o for o in n.outputs.keys()] for n in group}
 
-        self.relation = Constraint(group, noruleinit=True)
+        self.relation = Constraint( group, noruleinit=True )
 
         def _input_output_relation(block):
             for t in m.TIMESTEPS:
@@ -571,12 +585,13 @@ class Transformer(SimpleBlock):
                                 raise ValueError(
                                     "Error in constraint creation",
                                     "source: {0}, target: {1}".format(
-                                        n.label, o.label))
-                            block.relation.add((n, i, o, t), (lhs == rhs))
-        self.relation_build = BuildAction(rule=_input_output_relation)
+                                        n.label, o.label ) )
+                            block.relation.add( (n, i, o, t), (lhs == rhs) )
+
+        self.relation_build = BuildAction( rule=_input_output_relation )
 
 
-class NonConvexFlow(SimpleBlock):
+class NonConvexFlow( SimpleBlock ):
     r"""
     **The following sets are created:** (-> see basic sets at
         :class:`.Model` )
@@ -649,8 +664,9 @@ class NonConvexFlow(SimpleBlock):
                 \cdot shutdown\_costs(i, o)
 
     """
+
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__( *args, **kwargs )
 
     def _create(self, group=None):
         """ Creates set, variables, constraints for all flow object with
@@ -667,27 +683,30 @@ class NonConvexFlow(SimpleBlock):
 
         m = self.parent_block()
         # ########################## SETS #####################################
-        self.NONCONVEX_FLOWS = Set(initialize=[(g[0], g[1]) for g in group])
+        self.NONCONVEX_FLOWS = Set( initialize=[(g[0], g[1]) for g in group] )
 
-        self.MIN_FLOWS = Set(initialize=[(g[0], g[1]) for g in group
-                                         if sum(g[2].min[t]
-                                                for t in m.TIMESTEPS) > 0])
+        self.MIN_FLOWS = Set( initialize=[(g[0], g[1]) for g in group
+                                          if sum( g[2].min[t]
+                                                  for t in m.TIMESTEPS ) > 0] )
 
-        self.STARTUPFLOWS = Set(initialize=[(g[0], g[1]) for g in group
-                                if g[2].nonconvex.startup_costs is not None])
+        self.STARTUPFLOWS = Set( initialize=[(g[0], g[1]) for g in group
+                                             if g[2].nonconvex.startup_costs is not None] )
 
-        self.SHUTDOWNFLOWS = Set(initialize=[(g[0], g[1]) for g in group
-                                 if g[2].nonconvex.shutdown_costs is not None])
+        self.SHUTDOWNFLOWS = Set( initialize=[(g[0], g[1]) for g in group
+                                              if g[2].nonconvex.shutdown_costs is not None] )
+
+        self.OM_FLOWS = Set( initialize=[(g[0], g[1]) for g in group
+                                         if g[2].nonconvex.om_costs is not None] )
 
         # ################### VARIABLES AND CONSTRAINTS #######################
-        self.status = Var(self.NONCONVEX_FLOWS, m.TIMESTEPS, within=Binary)
+        self.status = Var( self.NONCONVEX_FLOWS, m.TIMESTEPS, within=Binary )
 
         if self.STARTUPFLOWS:
-            self.startup = Var(self.STARTUPFLOWS, m.TIMESTEPS,
-                               within=Binary)
+            self.startup = Var( self.STARTUPFLOWS, m.TIMESTEPS,
+                                within=Binary )
         if self.SHUTDOWNFLOWS:
-            self.shutdown = Var(self.SHUTDOWNFLOWS, m.TIMESTEPS,
-                                within=Binary)
+            self.shutdown = Var( self.SHUTDOWNFLOWS, m.TIMESTEPS,
+                                 within=Binary )
 
         def _minimum_flow_rule(block, i, o, t):
             """Rule definition for MILP minimum flow constraints.
@@ -696,8 +715,9 @@ class NonConvexFlow(SimpleBlock):
                     m.flows[i, o].min[t] * m.flows[i, o].nominal_value <=
                     m.flow[i, o, t])
             return expr
-        self.min = Constraint(self.MIN_FLOWS, m.TIMESTEPS,
-                              rule=_minimum_flow_rule)
+
+        self.min = Constraint( self.MIN_FLOWS, m.TIMESTEPS,
+                               rule=_minimum_flow_rule )
 
         def _maximum_flow_rule(block, i, o, t):
             """Rule definition for MILP maximum flow constraints.
@@ -706,35 +726,38 @@ class NonConvexFlow(SimpleBlock):
                     m.flows[i, o].max[t] * m.flows[i, o].nominal_value >=
                     m.flow[i, o, t])
             return expr
-        self.max = Constraint(self.MIN_FLOWS, m.TIMESTEPS,
-                              rule=_maximum_flow_rule)
+
+        self.max = Constraint( self.MIN_FLOWS, m.TIMESTEPS,
+                               rule=_maximum_flow_rule )
 
         def _startup_rule(block, i, o, t):
             """Rule definition for startup constraint of nonconvex flows.
             """
             if t > m.TIMESTEPS[1]:
                 expr = (self.startup[i, o, t] >= self.status[i, o, t] -
-                        self.status[i, o, t-1])
+                        self.status[i, o, t - 1])
             else:
                 expr = (self.startup[i, o, t] >= self.status[i, o, t] -
                         m.flows[i, o].nonconvex.initial_status)
             return expr
-        self.startup_constr = Constraint(self.STARTUPFLOWS, m.TIMESTEPS,
-                                         rule=_startup_rule)
+
+        self.startup_constr = Constraint( self.STARTUPFLOWS, m.TIMESTEPS,
+                                          rule=_startup_rule )
 
         def _shutdown_rule(block, i, o, t):
             """Rule definition for shutdown constraints of nonconvex flows.
             """
             if t > m.TIMESTEPS[1]:
-                expr = (self.shutdown[i, o, t] >= self.status[i, o, t-1] -
+                expr = (self.shutdown[i, o, t] >= self.status[i, o, t - 1] -
                         self.status[i, o, t])
             else:
                 expr = (self.shutdown[i, o, t] >=
                         m.flows[i, o].nonconvex.initial_status -
                         self.status[i, o, t])
             return expr
-        self.shutdown_constr = Constraint(self.SHUTDOWNFLOWS, m.TIMESTEPS,
-                                          rule=_shutdown_rule)
+
+        self.shutdown_constr = Constraint( self.SHUTDOWNFLOWS, m.TIMESTEPS,
+                                           rule=_shutdown_rule )
 
         # TODO: Add gradient constraints for nonconvex block / flows
         # TODO: Add  min-up/min-downtime constraints
@@ -742,26 +765,34 @@ class NonConvexFlow(SimpleBlock):
     def _objective_expression(self):
         r"""Objective expression for nonconvex flows.
         """
-        if not hasattr(self, 'NONCONVEX_FLOWS'):
+        if not hasattr( self, 'NONCONVEX_FLOWS' ):
             return 0
 
         m = self.parent_block()
 
         startcosts = 0
         shutdowncosts = 0
+        operationcosts= 0
 
         if self.STARTUPFLOWS:
-            startcosts += sum(self.startup[i, o, t] *
-                              m.flows[i, o].nonconvex.startup_costs
-                              for i, o in self.STARTUPFLOWS
-                              for t in m.TIMESTEPS)
-            self.startcosts = Expression(expr=startcosts)
+            startcosts += sum( self.startup[i, o, t] *
+                               m.flows[i, o].nonconvex.startup_costs
+                               for i, o in self.STARTUPFLOWS
+                               for t in m.TIMESTEPS )
+            self.startcosts = Expression( expr=startcosts )
 
         if self.SHUTDOWNFLOWS:
-            shutdowncosts += sum(self.shutdown[i, o, t] *
-                                 m.flows[i, o].nonconvex.shutdown_costs
-                                 for i, o in self.SHUTDOWNFLOWS
-                                 for t in m.TIMESTEPS)
-            self.shudowcosts = Expression(expr=shutdowncosts)
+            shutdowncosts += sum( self.shutdown[i, o, t] *
+                                  m.flows[i, o].nonconvex.shutdown_costs
+                                  for i, o in self.SHUTDOWNFLOWS
+                                  for t in m.TIMESTEPS )
+            self.shutdowncosts = Expression( expr=shutdowncosts )
 
-        return startcosts + shutdowncosts
+        if self.OM_FLOWS:
+            operationcosts += sum(self.status[i,o,t]*m.flows[i,o].nonconvex.om_costs
+                                  for i,o in self.OM_FLOWS
+                                  for t in m.TIMESTEPS)
+
+            self.operationcosts = Expression(expr=operationcosts)
+
+        return startcosts + shutdowncosts + operationcosts

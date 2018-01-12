@@ -49,3 +49,4 @@ class NonConvex:
         self.minimum_uptime = kwargs.get('minimum_uptime')
         self.minimum_downtime = kwargs.get('minimum_downtime')
         self.initial_status = kwargs.get('initial_status', 0)
+        self.om_costs=kwargs.get('om_costs', None)
