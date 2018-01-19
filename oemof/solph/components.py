@@ -93,6 +93,7 @@ class GenericStorage(Transformer):
         self.capacity_min = sequence(kwargs.get('capacity_min', 0))
         self.fixed_costs = kwargs.get('fixed_costs')
         self.investment = kwargs.get('investment')
+        self.initial_iteration=kwargs.get('initial_iteration', None)
 
         # Check investment
         e_no_nv = ("If an investment object is defined the invest variable "
@@ -209,24 +210,36 @@ class GenericStorageBlock(SimpleBlock):
             bounds = (n.nominal_capacity * n.capacity_min[t],
                       n.nominal_capacity * n.capacity_max[t])
             return bounds
+
         self.capacity = Var(self.STORAGES, m.TIMESTEPS,
                             bounds=_storage_capacity_bound_rule)
 
-        # set the initial capacity of the storage
-        for n in group:
-            if n.initial_capacity is not None:
-                self.capacity[n, m.TIMESTEPS[-1]] = (n.initial_capacity *
-                                                     n.nominal_capacity)
-                self.capacity[n, m.TIMESTEPS[-1]].fix()
+
+        # # set the initial capacity of the storage
+        # for n in group:
+        #     if n.initial_iteration is None:
+        #             self.capacity[n, m.TIMESTEPS[-1]] = (n.initial_capacity *
+        #                                                  n.nominal_capacity)
+        #             self.capacity[n, m.TIMESTEPS[-1]].fix()
+
+
 
         # storage balance constraint
         def _storage_balance_rule(block, n, t):
             """Rule definition for the storage balance of every storage n and
             timestep t
             """
+
+            if n.initial_iteration is not None and t==0:
+                previous_capacity = n.initial_capacity
+            elif n.initial_iteration is not None and t>0:
+                previous_capacity = block.capacity[n, m.previous_timesteps[t]]
+            else:
+                previous_capacity = block.capacity[n, m.previous_timesteps[t]]
+
             expr = 0
             expr += block.capacity[n, t]
-            expr += - block.capacity[n, m.previous_timesteps[t]] * (
+            expr += - previous_capacity * (
                 1 - n.capacity_loss[t])
             expr += (- m.flow[i[n], n, t] *
                      n.inflow_conversion_factor[t]) * m.timeincrement[t]
@@ -403,9 +416,10 @@ class GenericInvestmentStorageBlock(SimpleBlock):
             """Rule definition for constraint to connect initial storage
             capacity with capacity of last timesteps.
             """
-            expr = (self.capacity[n, m.TIMESTEPS[-1]] == (n.initial_capacity *
-                                                          self.invest[n]))
+
+            expr = (self.capacity[n, m.TIMESTEPS[-1]] == (n.initial_capacity))
             return expr
+
         self.initial_capacity = Constraint(
             self.INITIAL_CAPACITY, rule=_initial_capacity_invest_rule)
 
