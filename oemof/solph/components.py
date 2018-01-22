@@ -397,18 +397,29 @@ class GenericInvestmentStorageBlock(SimpleBlock):
         i = {n: [i for i in n.inputs][0] for n in group}
         o = {n: [o for o in n.outputs][0] for n in group}
 
+
+
         def _storage_balance_rule(block, n, t):
             """Rule definition for the storage energy balance.
             """
+
+            if n.initial_iteration is not None and t == 0:
+                previous_capacity = n.initial_capacity
+            elif n.initial_iteration is not None and t > 0:
+                previous_capacity = block.capacity[n, m.previous_timesteps[t]]
+            else:
+                previous_capacity = block.capacity[n, m.previous_timesteps[t]]
+
             expr = 0
             expr += block.capacity[n, t]
-            expr += - block.capacity[n, m.previous_timesteps[t]] * (
+            expr += - previous_capacity * (
                 1 - n.capacity_loss[t])
             expr += (- m.flow[i[n], n, t] *
                      n.inflow_conversion_factor[t]) * m.timeincrement[t]
             expr += (m.flow[n, o[n], t] /
                      n.outflow_conversion_factor[t]) * m.timeincrement[t]
             return expr == 0
+
         self.balance = Constraint(self.INVESTSTORAGES, m.TIMESTEPS,
                                   rule=_storage_balance_rule)
 
