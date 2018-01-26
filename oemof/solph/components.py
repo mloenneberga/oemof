@@ -230,10 +230,10 @@ class GenericStorageBlock(SimpleBlock):
             timestep t
             """
 
-            if n.initial_iteration is not None and t==0:
+            if n.initial_iteration==True and t==0:
+                previous_capacity = n.initial_capacity*n.nominal_capacity
+            elif n.initial_iteration==False and t==0:
                 previous_capacity = n.initial_capacity
-            elif n.initial_iteration is not None and t>0:
-                previous_capacity = block.capacity[n, m.previous_timesteps[t]]
             else:
                 previous_capacity = block.capacity[n, m.previous_timesteps[t]]
 
@@ -412,7 +412,7 @@ class GenericInvestmentStorageBlock(SimpleBlock):
 
             expr = 0
             expr += block.capacity[n, t]
-            expr += - previous_capacity * (
+            expr += - block.capacity[n, m.previous_timesteps[t]]* (
                 1 - n.capacity_loss[t])
             expr += (- m.flow[i[n], n, t] *
                      n.inflow_conversion_factor[t]) * m.timeincrement[t]
@@ -428,7 +428,8 @@ class GenericInvestmentStorageBlock(SimpleBlock):
             capacity with capacity of last timesteps.
             """
 
-            expr = (self.capacity[n, m.TIMESTEPS[-1]] == (n.initial_capacity))
+            expr = (self.capacity[n, m.TIMESTEPS[-1]] == (n.initial_capacity *
+                                                          self.invest[n]))
             return expr
 
         self.initial_capacity = Constraint(
