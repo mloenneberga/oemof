@@ -789,7 +789,9 @@ class NonConvexFlow( SimpleBlock ):
             self.shutdowncosts = Expression( expr=shutdowncosts )
 
         if self.OM_FLOWS:
-            operationcosts += sum(self.status[i,o,t]*m.flows[i,o].nonconvex.om_costs
+            operationcosts += sum(self.status[i,o,t]*
+                                  m.flows[i,o].nonconvex.om_costs*
+                                  m.flows[i,o].nominal_value
                                   for i,o in self.OM_FLOWS
                                   for t in m.TIMESTEPS)
 

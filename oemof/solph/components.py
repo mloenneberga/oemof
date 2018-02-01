@@ -215,12 +215,6 @@ class GenericStorageBlock( SimpleBlock ):
         self.capacity = Var( self.STORAGES, m.TIMESTEPS,
                              bounds=_storage_capacity_bound_rule )
 
-        # # set the initial capacity of the storage
-        # for n in group:
-        #     if n.initial_iteration is None:
-        #             self.capacity[n, m.TIMESTEPS[-1]] = (n.initial_capacity *
-        #                                                  n.nominal_capacity)
-        #             self.capacity[n, m.TIMESTEPS[-1]].fix()
 
 
 
@@ -229,12 +223,21 @@ class GenericStorageBlock( SimpleBlock ):
             """Rule definition for the storage balance of every storage n and
             timestep t
             """
-
-            if n.initial_iteration is not None and t == 0:
-                previous_capacity = n.initial_capacity * n.nominal_value
-            elif n.initial_iteration == False and t == 0:
-                previous_capacity = n.initial_capacity
+            if n.initial_iteration is not None:
+                if n.initial_iteration==1 and t == 0:
+                    previous_capacity = n.initial_capacity*n.nominal_capacity
+                elif n.initial_iteration==0 and t==0:
+                    previous_capacity = n.initial_capacity
+                else:
+                    previous_capacity=block.capacity[n, m.previous_timesteps[t]]
             else:
+                # set the initial capacity of the storage
+                for n in group:
+                    if n.initial_iteration is None:
+                        self.capacity[n, m.TIMESTEPS[-1]] = (n.initial_capacity *
+                                                             n.nominal_capacity)
+                        self.capacity[n, m.TIMESTEPS[-1]].fix()
+
                 previous_capacity = block.capacity[n, m.previous_timesteps[t]]
 
             expr = 0
