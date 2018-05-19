@@ -1,14 +1,20 @@
 # -*- coding: utf-8 -*-
 
 """Module to collect useful functions for economic calculation.
-"""
 
-__copyright__ = "oemof developer group"
-__license__ = "GPLv3"
+This file is part of project oemof (github.com/oemof/oemof). It's copyrighted
+by the contributors recorded in the version control history of the file,
+available from its original location oemof/oemof/tools/economics.py
+
+SPDX-License-Identifier: GPL-3.0-or-later
+"""
 
 
 def annuity(capex, n, wacc):
-    """
+    """Calculate the annuity.
+
+    annuity = capex * (wacc * (1 + wacc) ** n) / ((1 + wacc) ** n - 1)
+
     Parameters
     ----------
     capex : float
@@ -20,7 +26,7 @@ def annuity(capex, n, wacc):
 
     Returns
     -------
-    float
+    float : annuity
 
     """
     return capex * (wacc * (1 + wacc) ** n) / ((1 + wacc) ** n - 1)

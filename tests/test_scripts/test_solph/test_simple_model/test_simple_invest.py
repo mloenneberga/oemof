@@ -4,21 +4,28 @@
 solve it with the solph module. Results are plotted with outputlib.
 
 Data: example_data.csv
-"""
 
-__copyright__ = "oemof developer group"
-__license__ = "GPLv3"
+This file is part of project oemof (github.com/oemof/oemof). It's copyrighted
+by the contributors recorded in the version control history of the file,
+available from its original location
+oemof/tests/test_scripts/test_solph/test_simple_dispatch/test_simple_dispatch.py
+
+SPDX-License-Identifier: GPL-3.0-or-later
+"""
 
 from nose.tools import eq_
 import os
 import pandas as pd
 from oemof.solph import (Sink, Source, Transformer, Bus, Flow, Model,
-                         EnergySystem)
+                         EnergySystem, Investment)
+from oemof.tools import economics
 from oemof.outputlib import processing, views
+from oemof.network import Node
 
 
 def test_dispatch_example(solver='cbc', periods=24*5):
     """Create an energy system and optimize the dispatch at least costs."""
+    Node.registry = None
 
     filename = os.path.join(os.path.dirname(__file__), 'input_data.csv')
     data = pd.read_csv(filename, sep=",")
@@ -41,11 +48,15 @@ def test_dispatch_example(solver='cbc', periods=24*5):
     #                      outputs={bel: Flow(variable_costs=200)})
 
     # sources
-    wind = Source(label='wind', outputs={bel: Flow(actual_value=data['wind'],
-                  nominal_value=66.3, fixed=True)})
+    ep_wind = economics.annuity(capex=1000, n=20, wacc=0.05)
+    wind = Source(label='wind', outputs={bel: Flow(
+                    actual_value=data['wind'], fixed=True,
+                    investment=Investment(ep_costs=ep_wind, existing=100))})
 
-    pv = Source(label='pv', outputs={bel: Flow(actual_value=data['pv'],
-                nominal_value=65.3, fixed=True)})
+    ep_pv = economics.annuity(capex=1500, n=20, wacc=0.05)
+    pv = Source(label='pv', outputs={bel: Flow(
+                    actual_value=data['pv'], fixed=True,
+                    investment=Investment(ep_costs=ep_pv, existing=80))})
 
     # demands (electricity/heat)
     demand_el = Sink(label='demand_elec', inputs={bel: Flow(nominal_value=85,
@@ -60,7 +71,7 @@ def test_dispatch_example(solver='cbc', periods=24*5):
     pp_coal = Transformer(label='pp_coal',
                           inputs={bcoal: Flow()},
                           outputs={bel: Flow(nominal_value=20.2,
-                                                   variable_costs=25)},
+                                             variable_costs=25)},
                           conversion_factors={bel: 0.39})
 
     pp_lig = Transformer(label='pp_lig',
@@ -95,7 +106,7 @@ def test_dispatch_example(solver='cbc', periods=24*5):
     heat_source = Source(label='heat_source', outputs={b_heat_source: Flow()})
 
     cop = 3
-    heat_pump = Transformer(label='heat_pump',
+    heat_pump = Transformer(label='el_heat_pump',
                             inputs={bel: Flow(), b_heat_source: Flow()},
                             outputs={bth: Flow(nominal_value=10)},
                             conversion_factors={
@@ -110,7 +121,7 @@ def test_dispatch_example(solver='cbc', periods=24*5):
     # ################################ optimization ###########################
 
     # create optimization model based on energy_system
-    optimization_model = Model(es=energysystem)
+    optimization_model = Model(energysystem=energysystem)
 
     # solve problem
     optimization_model.solve(solver=solver)
@@ -131,20 +142,24 @@ def test_dispatch_example(solver='cbc', periods=24*5):
     data = views.node(results, 'b_el')
 
     # generate results to be evaluated in tests
-    results = data['sequences'].sum(axis=0).to_dict()
+    comp_results = data['sequences'].sum(axis=0).to_dict()
+    comp_results['pv_capacity'] = results[(pv, bel)]['scalars'].invest
+    comp_results['wind_capacity'] = results[(wind, bel)]['scalars'].invest
 
     test_results = {
-        (('wind', 'b_el'), 'flow'): 1773,
-        (('pv', 'b_el'), 'flow'): 605,
+        (('wind', 'b_el'), 'flow'): 9239,
+        (('pv', 'b_el'), 'flow'): 1147,
         (('b_el', 'demand_elec'), 'flow'): 7440,
-        (('b_el', 'excess_el'), 'flow'): 139,
-        (('pp_chp', 'b_el'), 'flow'): 666,
-        (('pp_lig', 'b_el'), 'flow'): 1210,
-        (('pp_gas', 'b_el'), 'flow'): 1519,
-        (('pp_coal', 'b_el'), 'flow'): 1925,
+        (('b_el', 'excess_el'), 'flow'): 6261,
+        (('pp_chp', 'b_el'), 'flow'): 477,
+        (('pp_lig', 'b_el'), 'flow'): 850,
+        (('pp_gas', 'b_el'), 'flow'): 934,
+        (('pp_coal', 'b_el'), 'flow'): 1256,
         (('pp_oil', 'b_el'), 'flow'): 0,
-        (('b_el', 'heat_pump'), 'flow'): 118,
+        (('b_el', 'el_heat_pump'), 'flow'): 202,
+        'pv_capacity': 44,
+        'wind_capacity': 246,
     }
 
     for key in test_results.keys():
-        eq_(int(round(results[key])), int(round(test_results[key])))
+        eq_(int(round(comp_results[key])), int(round(test_results[key])))

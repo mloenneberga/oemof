@@ -1,10 +1,13 @@
 # -*- coding: utf-8 -
 
 """Test the created constraints against approved constraints.
-"""
 
-__copyright__ = "oemof developer group"
-__license__ = "GPLv3"
+This file is part of project oemof (github.com/oemof/oemof). It's copyrighted
+by the contributors recorded in the version control history of the file,
+available from its original location oemof/tests/test_solph_network_classes.py
+
+SPDX-License-Identifier: GPL-3.0-or-later
+"""
 
 from oemof import solph
 from nose.tools import assert_raises, eq_, ok_
@@ -34,3 +37,5 @@ def test_flow_classes():
         solph.Flow(investment=solph.Investment(), nominal_value=4)
     with assert_raises(ValueError):
         solph.Flow(investment=solph.Investment(), nonconvex=solph.NonConvex())
+    with assert_raises(AttributeError):
+        solph.Flow(fixed_costs=34)

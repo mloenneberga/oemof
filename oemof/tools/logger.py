@@ -1,6 +1,12 @@
 # -*- coding: utf-8
 
 """Helpers to log your modeling process with oemof.
+
+This file is part of project oemof (github.com/oemof/oemof). It's copyrighted
+by the contributors recorded in the version control history of the file,
+available from its original location oemof/oemof/tools/logger.py
+
+SPDX-License-Identifier: GPL-3.0-or-later
 """
 
 import os
@@ -62,8 +68,8 @@ def define_logging(logpath=None, logfile='oemof.log', file_format=None,
     Examples
     --------
     To define the default logger you have to import the python logging
-     library and this function. The first logging message should be the
-     path where the log file is saved to.
+    library and this function. The first logging message should be the
+    path where the log file is saved to.
 
     >>> import logging
     >>> from oemof.tools import logger

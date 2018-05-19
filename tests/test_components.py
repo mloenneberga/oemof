@@ -1,10 +1,13 @@
 # -*- coding: utf-8 -
 
 """Tests of the component module.
-"""
 
-__copyright__ = "oemof developer group"
-__license__ = "GPLv3"
+This file is part of project oemof (github.com/oemof/oemof). It's copyrighted
+by the contributors recorded in the version control history of the file,
+available from its original location oemof/tests/test_components.py
+
+SPDX-License-Identifier: GPL-3.0-or-later
+"""
 
 from nose import tools
 from oemof import solph
@@ -22,8 +25,7 @@ def test_generic_storage_1():
         capacity_loss=0.00, initial_capacity=0,
         nominal_input_capacity_ratio=1/6,
         nominal_output_capacity_ratio=1/6,
-        inflow_conversion_factor=1, outflow_conversion_factor=0.8,
-        fixed_costs=35)
+        inflow_conversion_factor=1, outflow_conversion_factor=0.8)
 
 
 @tools.raises(AttributeError)
@@ -38,8 +40,7 @@ def test_generic_storage_2():
         capacity_loss=0.00, initial_capacity=0,
         nominal_input_capacity_ratio=1/6,
         nominal_output_capacity_ratio=1/6,
-        inflow_conversion_factor=1, outflow_conversion_factor=0.8,
-        fixed_costs=35)
+        inflow_conversion_factor=1, outflow_conversion_factor=0.8)
 
 
 @tools.raises(AttributeError)
@@ -55,7 +56,6 @@ def test_generic_storage_3():
         nominal_input_capacity_ratio=1/6,
         nominal_output_capacity_ratio=1/6,
         inflow_conversion_factor=1, outflow_conversion_factor=0.8,
-        fixed_costs=35,
         investment=solph.Investment(ep_costs=23))
 
 
@@ -69,5 +69,4 @@ def test_generic_storage_4():
         outputs={bel: solph.Flow(variable_costs=10e10)},
         capacity_loss=0.00, initial_capacity=0,
         nominal_output_capacity_ratio=1/6,
-        inflow_conversion_factor=1, outflow_conversion_factor=0.8,
-        fixed_costs=35)
+        inflow_conversion_factor=1, outflow_conversion_factor=0.8)

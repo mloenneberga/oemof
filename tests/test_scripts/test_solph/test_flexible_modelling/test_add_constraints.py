@@ -5,10 +5,14 @@ This script shows how to a an individual constraint to the oemof solph
 Model.
 The constraint we add forces a flow to be greater or equal a certain share
 of all inflows of its target bus. Moreover we will set an emission constraint.
-"""
 
-__copyright__ = "oemof developer group"
-__license__ = "GPLv3"
+This file is part of project oemof (github.com/oemof/oemof). It's copyrighted
+by the contributors recorded in the version control history of the file,
+available from its original location oemof/tests/test_scripts/test_solph/
+test_flexible_modelling/test_add_constraints.py
+
+SPDX-License-Identifier: GPL-3.0-or-later
+"""
 
 from nose.tools import ok_
 import logging
@@ -47,7 +51,7 @@ def test_add_constraints_example(solver='cbc', nologg=False):
                 conversion_factors={b_el: 0.41})
 
     # create the model
-    om = Model(es=es)
+    om = Model(energysystem=es)
 
     # add specific emission values to flow objects if source is a commodity bus
     for s, t in om.flows.keys():
